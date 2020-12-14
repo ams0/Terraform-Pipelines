@@ -1,0 +1,20 @@
+{
+  "variables": {
+    "terraform": {
+      "value": "0.12.29"
+    },
+    "tflint": {
+      "value": "v0.14.0"
+    },
+    "tflint_sha256": {
+      "value": "4908d30078ecbd3b732ce5c2caabad77b6b768d46397ae009dd8dab8a1cbf6ac0"
+    },
+    "goversion": {
+      "value": "1.14.2"
+    }
+    __ARM_CLOUD_CONFIGS__
+  },
+  "type": "Vsts",
+  "name": "__VG_NAME__",
+  "description": "tool_versions variable group"
+}

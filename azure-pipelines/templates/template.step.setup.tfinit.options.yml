@@ -1,0 +1,10 @@
+steps:
+  - script: |
+      COMMAND_OPTIONS="-reconfigure"
+      if [ "$(INSTALL_TYPE)" == "SERVER" ]; then
+        echo "Configure offline provider plugin dir."
+        COMMAND_OPTIONS="${COMMAND_OPTIONS} -get-plugins=false -plugin-dir=/home/AzureUser/terraform/providers"
+      fi
+      echo "##vso[task.setvariable variable=TF_INIT_COMMAND_OPTIONS]$COMMAND_OPTIONS"
+    displayName: "Configure TF Init Options"
+    name: tfInitOptions

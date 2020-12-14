@@ -1,0 +1,110 @@
+##################################
+# TF Plan Pipeline Configuration #
+##################################
+
+name: $(BuildDefinitionName).$(DayOfYear)$(Rev:.r)
+
+trigger:
+  - none
+
+pr:
+  - none
+
+
+pool: "Default"
+
+resources:
+  repositories:
+  - repository: Terraform-Code
+    type: git
+    name: Terraform-Code
+    ref: 'refs/heads/master'
+    
+variables:
+  - name: workDir
+    value: "$(System.DefaultWorkingDirectory)/terraform"
+  #- name: environment #Variable is passed in as queue time variable
+  #  value: "staging"
+  # - name: "DEPLOYMENT_DIR" #Variable is passed in as queue time variable
+  #   value: "02_networking/01_deployments"
+  #- name: azureSubscription #Variable is passed in as queue time variable
+  #  value: "dev"
+  - group: tool_versions
+
+stages:
+  - stage: RunTfPlan
+    displayName: "Run TF Plan on workdir and output plan and plan.json as pipeline artifacts"
+    jobs:
+      - job: RunTfPlanJob
+        steps:
+          - template: ./templates/template.step.checkout.terraform-code.yml
+              
+          - template: ./templates/template.step.setupenv.yml
+            parameters:
+              environment: $(ENVIRONMENT)
+
+          - task: Bash@3
+            displayName: "Create Deployment Name"
+            inputs:
+              targetType: "inline"
+              script: |
+                mkdir $(Build.ArtifactStagingDirectory)
+                DEPLOYMENT_NAME=`echo "$(DEPLOYMENT_DIR)" | sed 's/\//./g'`
+                echo "##vso[task.setvariable variable=DEPLOYMENT_NAME]${DEPLOYMENT_NAME}"
+                echo $DEPLOYMENT_NAME
+                echo $DEPLOYMENT_DIR
+          
+          - template: ./templates/template.step.install.terraform.yml
+            parameters:
+              version: $(terraform)
+
+          - template: ./templates/template.step.setup.tfinit.options.yml
+          
+          - task: TerraformCLI@0
+            displayName: "Run TF Init"
+            inputs:
+              command: 'init'
+              workingDirectory: '$(workDir)/$(DEPLOYMENT_DIR)'
+              backendType: 'azurerm'
+              backendServiceArm: '$(azureSubscription)'
+              backendAzureRmResourceGroupName: '$(TF_VAR_BACKEND_RESOURCE_GROUP_NAME)'
+              backendAzureRmStorageAccountName: '$(TF_VAR_BACKEND_STORAGE_ACCOUNT_NAME)'
+              backendAzureRmContainerName: '$(TF_VAR_BACKEND_CONTAINER_NAME)'
+              backendAzureRmKey: '$(DEPLOYMENT_DIR)'
+              commandOptions: '-reconfigure -backend-config="environment=AZURESTACKCLOUD"'
+
+          - task: TerraformCLI@0
+            displayName: "Run TF Plan"
+            inputs:
+              command: "plan"
+              environmentServiceName: "$(azureSubscription)"
+              workingDirectory: "$(workDir)/$(DEPLOYMENT_DIR)"
+              secureVarsFile: "$(ENVIRONMENT).compiled.env"
+              commandOptions: "-input=false -out=$(Build.ArtifactStagingDirectory)/$(Build.BuildId).$(DEPLOYMENT_NAME).plan"
+
+          - task: Bash@3
+            displayName: "Run TF Show"
+            inputs:
+              targetType: "inline"
+              script: |
+                #Apply .compiled.env file to shell
+                set -o allexport && . $(Agent.TempDirectory)/$(ENVIRONMENT).compiled.env && set +o allexport
+                cd $(workDir)/$(DEPLOYMENT_DIR)''
+                terraform show -json $(Build.ArtifactStagingDirectory)/$(Build.BuildId).$(DEPLOYMENT_NAME).plan > $(Build.ArtifactStagingDirectory)/$(Build.BuildId).$(DEPLOYMENT_NAME).json
+
+          - task: Bash@3
+            displayName: "Detect Destroy Operation"
+            name: detectDestroy
+            inputs:
+              targetType: "inline"
+              Script: |
+                planFile=$(Build.ArtifactStagingDirectory)/$(Build.BuildId).$(DEPLOYMENT_NAME).json
+                deletePresent=`cat $planFile | jq .resource_changes[].change.actions[] | xargs | grep -c delete`
+
+                if [ $deletePresent -gt 0 ]; then
+                  artifactFileName=$(Build.ArtifactStagingDirectory)/DESTROY_FOUND_$(DEPLOYMENT_NAME).txt
+                  echo "Delete found in deployment $(DEPLOYMENT_DIR)" > $artifactFileName                
+                  echo "##vso[task.logissue type=warning]Destroy detected in ${planFile}."
+                fi
+
+

@@ -1,0 +1,6 @@
+{
+  "name": "__REPO_NAME__",
+  "project": {
+    "id": "__AZDO_PROJECT_ID__"
+  }
+}

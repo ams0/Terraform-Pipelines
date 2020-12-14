@@ -1,0 +1,17 @@
+{
+    "token": "__PRINCIPAL_NAME__",
+    "merge": true,
+    "accessControlEntries": [
+        {
+            "descriptor": "Microsoft.TeamFoundation.ServiceIdentity;__GROUP_DOMAIN_ID__:Build:__PRINCIPAL_NAME__",
+            "allow": 128,
+            "deny": 0,
+            "extendedInfo": {
+                "effectiveAllow": 128,
+                "effectiveDeny": 0,
+                "inheritedAllow": 128,
+                "inheritedDeny": 0
+            }
+        }
+    ]
+}

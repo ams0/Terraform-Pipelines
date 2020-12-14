@@ -1,0 +1,170 @@
+######################################################
+# Stage Configuration and Execution Ordering for Dev #
+######################################################
+
+stages:
+  - stage: Validate
+    displayName: "Validate Configuration"
+    jobs:
+      ##################################
+      # Identify Changes to be applied #
+      ##################################
+      - template: template.job.gitdiff.yml
+        parameters:
+          baseBranch: "$(gitDiffBaseBranch)"
+          compareBranch: "$(gitDiffCompareBranch)"
+
+      ##################################
+      # Validate and Initialize Layers #
+      ##################################
+      - job: TfValidation
+        workspace:
+          clean:  resources       
+        displayName: "Run TF Validate"
+        condition:  and(succeeded(), eq(variables.runTfValidation, 'true'))
+        dependsOn:
+          - gitDiff
+        variables:
+          deployments: $[ dependencies.gitDiff.outputs['gitDiff.DEPLOYMENTS'] ]
+        steps:
+          - template: template.step.checkout.terraform-code.yml
+
+          - template: template.step.tfvalidation.yml
+            parameters:
+              deployments: $(deployments)
+
+      ###########################
+      # Install and Run Linters #
+      ###########################
+      - job: TfLint
+        workspace:
+          clean:  resources             
+        displayName: "Run TF Lint"
+        condition:  and(succeeded(), eq(variables.runTfLint, 'true'))
+        dependsOn:
+          - gitDiff
+        variables:
+          deployments: $[ dependencies.gitDiff.outputs['gitDiff.DEPLOYMENTS'] ]
+        steps:
+          - template: template.step.checkout.terraform-code.yml
+
+          - template: template.step.tflint.yml
+            parameters:
+              deployments: $(deployments)
+
+      #########################
+      # Check for Credentials #
+      #########################
+      - job: CredScan
+        workspace:
+          clean:  resources             
+        displayName: "Run CredScan"
+        condition:  and(succeeded(), eq(variables.runCredScan, 'true'))
+        pool:
+          vmImage: "windows-latest"
+        steps:
+          - template: template.step.checkout.terraform-code.yml
+
+          - template: template.step.credscan.yml
+      ################
+      # Unit Testing #
+      ################
+      - job: RunUnitTest
+        displayName: "Run Unit Test"
+        condition:  and(succeeded(), eq(variables.runUnitTest, 'true'))
+        dependsOn:
+          - gitDiff
+        steps:
+          - template: template.step.checkout.terraform-code.yml
+
+          - template: template.step.unittesting.yml
+
+  # ###############################
+  # Temp Destroy Step - Hardcoded #
+  # ###############################
+  # - template: tf-destroy-steps-template.yml
+
+  ##################
+  # Plan and Apply #
+  ##################
+  - template: template.stage.processtflayer.yml
+    parameters:
+      stageLayer: 02_sql
+      previousLayer: Validate
+      tags: "00"
+
+  - template: template.stage.processtflayer.yml
+    parameters:
+      stageLayer: 03_webapp
+      previousLayer: TfPlanApply_02_sql
+      tags: "00"
+
+  # ###################################
+  # # Plan and Apply Monitoring Layer #
+  # ###################################
+  # - template: template.stage.processtflayer.yml
+  #   parameters:
+  #     stageLayer: 04_monitoring_and_logging
+  #     previousLayer: TfPlanApply_03_runtime_environment
+  #     tags: "04"
+  # ###########################################
+  # # Plan and Apply Post Configuration Layer #
+  # ###########################################
+  # - template: template.stage.processtflayer.yml
+  #   parameters:
+  #     stageLayer: 05_post_configuration
+  #     previousLayer: TfPlanApply_04_monitoring_and_logging
+  #     tags: "05"
+
+  - stage: GenScriptStage
+    displayName: "Generate Script"
+    dependsOn:
+      - Validate
+      - TfPlanApply_02_sql
+      - TfPlanApply_03_webapp
+    variables:
+      LAYERS: $[ stageDependencies.Validate.gitDiff.outputs['gitDiff.LAYERS'] ]
+      DEPLOYMENTS: $[ stageDependencies.Validate.gitDiff.outputs['gitDiff.DEPLOYMENTS'] ]
+    jobs:
+      - job: GenScriptJob
+        steps:
+          - task: DownloadSecureFile@1
+            displayName: "Download Environment File"
+            inputs:
+              secureFile: "$(environment).compiled.env"
+
+          - task: AzureCLI@2
+            name: GenScriptStep
+            inputs:
+              azureSubscription: "$(azureSubscription)"
+              scriptType: "bash"
+              workingDirectory: "$(System.DefaultWorkingDirectory)"
+              addSpnToEnvironment: true
+              scriptLocation: "inlineScript"
+              inlineScript: |
+                azAccount=`az account show --output json`
+                subscriptionId=`echo ${azAccount} | jq -c -r '.id'`
+                tenantId=`echo ${azAccount} | jq -c -r '.tenantId'`
+                cloudEnvName=`echo ${azAccount} | jq -c -r '.environmentName'`
+
+                template=$(cat "azure-pipelines/scripts/template.storageinit.sh")
+                script=$(echo "${template}" | sed 's~__SOURCE_VERSION__~$(Build.SourceVersion)~' | sed 's~__ENVIRONMENT__~$(ENVIRONMENT)~' | sed 's~__SUBSCRIPTION_ID__~'"${subscriptionId}"'~' | sed 's~__TENANT_ID__~'"${tenantId}"'~' | sed 's~__CLOUD_NAME__~'"${cloudEnvName}"'~')
+                echo "${script}" > "$(Build.ArtifactStagingDirectory)/storageinit.sh"
+
+                template=$(cat "azure-pipelines/scripts/template.deploy.sh")
+                script=$(echo "${template}" | sed 's~__SOURCE_VERSION__~$(Build.SourceVersion)~'  | sed 's~__ENVIRONMENT__~$(ENVIRONMENT)~' | sed 's~__LAYERS__~$(LAYERS)~' | sed 's~__DEPLOYMENTS__~$(DEPLOYMENTS)~' | sed 's~__SUBSCRIPTION_ID__~'"${subscriptionId}"'~' | sed 's~__TENANT_ID__~'"${tenantId}"'~' | sed 's~__CLOUD_NAME__~'"${cloudEnvName}"'~')
+                echo "${script}" > "$(Build.ArtifactStagingDirectory)/deploy.sh"
+              failOnStandardError: true
+
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)'
+              artifact: 'script'
+              publishLocation: 'pipeline'
+
+  #######################
+  # Backup Remote State #
+  #######################
+  - stage: BackupTfState
+    jobs:
+      - template: template.job.backupremotestate.yml

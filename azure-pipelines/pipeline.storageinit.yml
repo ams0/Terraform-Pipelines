@@ -1,0 +1,38 @@
+#######################################
+# Storage Init Pipeline Configuration #
+#######################################
+
+name: $(BuildDefinitionName).$(DayOfYear)$(Rev:.r)
+
+trigger:
+  - none
+
+pr:
+  - none
+
+pool:
+  vmImage: "ubuntu-latest"
+
+resources:
+  repositories:
+  - repository: Terraform-Code
+    type: git
+    name: Terraform-Code
+    ref: 'refs/heads/master'
+    
+variables:
+  #############################################################
+  # Those vars have to been declared on pipeline object level #
+  #############################################################
+  # - name: environment
+  #   value: "staging"
+  # - name: azureSubscription
+  #   value: "terraform-dev"
+  - name: workDir
+    value: "$(System.DefaultWorkingDirectory)/terraform"
+  - group: tool_versions
+
+
+stages:
+  - template: ./templates/template.stage.storageinit.yml
+

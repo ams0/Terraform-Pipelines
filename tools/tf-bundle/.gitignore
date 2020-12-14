@@ -1,0 +1,6 @@
+# working dirs
+work_dir
+terraform
+
+# output
+terraform-binaries.tar.gz

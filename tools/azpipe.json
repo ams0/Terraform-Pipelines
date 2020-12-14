@@ -1,0 +1,243 @@
+{
+    "pipelinePrefixName": "infrastructure",
+    "gitHubRepositoryUrl": "https://dev.azure.com/csedevops/terraform-template-public",
+    "gitHubOrganizationName": "csedevops",
+    "gitHubRepositoryName": "terraform-template-public",
+    "gitHubBranch": "master",
+    "adoGitHubServiceConnectionName": "rguthrie",
+    "adoOrganization": "https://dev.azure.com/csedevops",
+    "adoProject": "terraform-template-public",
+    "adoAzureServiceConnectionPrefixName": "terraform-template-public",
+    "environments": [
+        {
+            "name": "staging"
+        },
+        {
+            "name": "dev"
+        },
+        {
+            "name": "prod"
+        }
+    ],
+    "infrastructurePipelines": [
+        {
+            "name": "tfapply",
+            "folderPath": "infrastructure/pipelines_shared",
+            "environmentAgnostic": "true"
+        },
+        {
+            "name": "tfplan",
+            "folderPath": "infrastructure/pipelines_shared",
+            "environmentAgnostic": "true"
+        },
+        {
+            "name": "tfdestroy",
+            "folderPath": "infrastructure/env_$(environment)",
+            "environmentAgnostic": "false",
+            "variables": [
+                {
+                    "name": "azureSubscription",
+                    "value": "$(adoAzureServiceConnectionPrefixName)$(environment)",
+                    "allowOverride": "false"
+                },
+                {
+                    "name": "environment",
+                    "value": "$(environment)",
+                    "allowOverride": "false"
+                },
+                {
+                    "name": "DEPLOYMENT_DIR",
+                    "value": "XX_layer/XX_deployment",
+                    "allowOverride": "true"
+                }
+            ]
+        },
+        {
+            "name": "infrastructure",
+            "folderPath": "infrastructure/env_$(environment)",
+            "environmentAgnostic": "false",
+            "variables": [
+                {
+                    "name": "azureSubscription",
+                    "value": "$(adoAzureServiceConnectionPrefixName)$(environment)",
+                    "allowOverride": "false"
+                },
+                {
+                    "name": "environment",
+                    "value": "$(environment)",
+                    "allowOverride": "false"
+                },
+                {
+                    "name": "runPipelinesServiceConnection",
+                    "value": "runpipelines",
+                    "allowOverride": "false"
+                },
+                {
+                    "name": "FULL_DEPLOYMENT",
+                    "value": "false",
+                    "allowOverride": "true"
+                },
+                {
+                    "name": "gitDiffBaseBranch",
+                    "value": "master",
+                    "allowOverride": "true"
+                }
+            ]
+        },
+        {
+            "name": "storageinit",
+            "folderPath": "infrastructure/env_$(environment)",
+            "environmentAgnostic": "false",
+            "variables": [
+                {
+                    "name": "azureSubscription",
+                    "value": "$(adoAzureServiceConnectionPrefixName)$(environment)",
+                    "allowOverride": "false"
+                },
+                {
+                    "name": "environment",
+                    "value": "$(environment)",
+                    "allowOverride": "false"
+                }
+            ]
+        },
+        {
+            "name": "backupremotestate",
+            "folderPath": "infrastructure/env_$(environment)",
+            "environmentAgnostic": "false",
+            "variables": [
+                {
+                    "name": "azureSubscription",
+                    "value": "$(adoAzureServiceConnectionPrefixName)$(environment)",
+                    "allowOverride": "false"
+                },
+                {
+                    "name": "environment",
+                    "value": "$(environment)",
+                    "allowOverride": "false"
+                }
+            ]
+        },
+        {
+            "name": "apps",
+            "folderPath": "applications/env_$(environment)",
+            "environmentAgnostic": "false",
+            "variables": [
+                {
+                    "name": "azureSubscription",
+                    "value": "$(adoAzureServiceConnectionPrefixName)$(environment)",
+                    "allowOverride": "false"
+                },
+                {
+                    "name": "environment",
+                    "value": "$(environment)",
+                    "allowOverride": "false"
+                }
+            ]
+        }
+    ],
+    "applicationPipelines": [
+        {
+            "name": "podidentity",
+            "folderPath": "applications/env_$(environment)",
+            "environmentAgnostic": "false",
+            "variables": [
+                {
+                    "name": "azureSubscription",
+                    "value": "$(adoAzureServiceConnectionPrefixName)$(environment)",
+                    "allowOverride": "false"
+                },
+                {
+                    "name": "environment",
+                    "value": "$(environment)",
+                    "allowOverride": "false"
+                }
+            ]
+        },
+        {
+            "name": "agic",
+            "folderPath": "applications/env_$(environment)",
+            "environmentAgnostic": "false",
+            "variables": [
+                {
+                    "name": "azureSubscription",
+                    "value": "$(adoAzureServiceConnectionPrefixName)$(environment)",
+                    "allowOverride": "false"
+                },
+                {
+                    "name": "environment",
+                    "value": "$(environment)",
+                    "allowOverride": "false"
+                }
+            ]
+        },
+        {
+            "name": "certmanager",
+            "folderPath": "applications/env_$(environment)",
+            "environmentAgnostic": "false",
+            "variables": [
+                {
+                    "name": "azureSubscription",
+                    "value": "$(adoAzureServiceConnectionPrefixName)$(environment)",
+                    "allowOverride": "false"
+                },
+                {
+                    "name": "environment",
+                    "value": "$(environment)",
+                    "allowOverride": "false"
+                }
+            ]
+        },
+        {
+            "name": "grafana",
+            "folderPath": "applications/env_$(environment)",
+            "environmentAgnostic": "false",
+            "variables": [
+                {
+                    "name": "azureSubscription",
+                    "value": "$(adoAzureServiceConnectionPrefixName)$(environment)",
+                    "allowOverride": "false"
+                },
+                {
+                    "name": "environment",
+                    "value": "$(environment)",
+                    "allowOverride": "false"
+                }
+            ]
+        },
+        {
+            "name": "keycloak",
+            "folderPath": "applications/env_$(environment)",
+            "environmentAgnostic": "false",
+            "variables": [
+                {
+                    "name": "azureSubscription",
+                    "value": "$(adoAzureServiceConnectionPrefixName)$(environment)",
+                    "allowOverride": "false"
+                },
+                {
+                    "name": "environment",
+                    "value": "$(environment)",
+                    "allowOverride": "false"
+                }
+            ]
+        },
+        {
+            "name": "prometheus",
+            "folderPath": "applications/env_$(environment)",
+            "environmentAgnostic": "false",
+            "variables": [
+                {
+                    "name": "azureSubscription",
+                    "value": "$(adoAzureServiceConnectionPrefixName)$(environment)",
+                    "allowOverride": "false"
+                },
+                {
+                    "name": "environment",
+                    "value": "$(environment)",
+                    "allowOverride": "false"
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,148 @@
+######################################
+# Stage Process IAC Terraform Layers #
+######################################
+
+parameters:
+  - name: stageLayer
+    type: string
+    default: ""
+  - name: previousLayer
+    type: string
+    default: ""
+  - name: tags
+    type: string
+    default: ""
+
+stages:
+  - stage: TfPlanApply_${{ parameters.stageLayer }}
+    displayName: "${{ parameters.stageLayer }} - TF Plan and Apply"
+    condition: succeeded()
+    dependsOn: ${{ parameters.previousLayer }}
+    jobs:
+      - template: template.job.gitdiff.yml
+        parameters:
+          baseBranch: "$(gitDiffBaseBranch)"
+          compareBranch: "$(gitDiffCompareBranch)"
+
+      - job: TfPlan
+        displayName: "Run TF Plan jobs"
+        condition: and(ne(dependencies.gitDiff.outputs['gitDiff.DEPLOYMENTS'], ''), contains(dependencies.gitDiff.outputs['gitDiff.LAYERS'], '${{ parameters.stageLayer }}'), eq(variables.runTfPlan, 'true'))
+        dependsOn:
+          - gitDiff
+        variables:
+          deployments: $[ dependencies.gitDiff.outputs['gitDiff.DEPLOYMENTS'] ]
+          pipelineFolderPath: $(TfPlanPipelineFolderPath)
+          pipelineName: $(TfPlanPipelineName)
+        steps:
+          - template: template.step.checkout.terraform-code.yml
+
+          - task: Bash@3
+            inputs:
+              targetType: "inline"
+              script: |
+                if [ -z "${SYSTEM_DEBUG}" ]; then
+                  systemdebug="false"
+                else
+                  systemdebug="true"
+                fi
+
+                IFS=' ' read -r -a deployments <<< "$(deployments)"
+
+                for deployment in "${deployments[@]}"
+                do
+                if [[ $deployment == ${{ parameters.stageLayer }}* ]]; then 
+                    vars='{"DEPLOYMENT_DIR": "'"${deployment}"'", "ENVIRONMENT": "'"$(ENVIRONMENT)"'", "azureSubscription": "'"$(azureSubscription)"'", "System.Debug": "'"${systemdebug}"'", "tfCodeBranch": "'"$(tfCodeBranch)"'"}'
+                    varsArray=("${varsArray[@]}" "${vars}")
+                fi
+                done
+
+                varsOut=$(IFS=','; echo "${varsArray[*]}")
+
+                echo "##vso[task.setvariable variable=runPipelinesBuildParameters][${varsOut}]"
+              failOnStderr: true
+
+          - task: RunPipelines@2
+            inputs:
+              serviceConnection: "$(runPipelinesServiceConnection)"
+              project: "$(System.TeamProject)"
+              folderPath: "$(pipelineFolderPath)"
+              buildDefinition: "$(pipelineName)"
+              setBranch: false
+              Branch: "$(Build.SourceBranch)"
+              targetType: "inline"
+              buildParameters: "$(runPipelinesBuildParameters)"
+              customPrefix: "TfPlan-${{ parameters.stageLayer }}"
+              waitForQueuedBuildsToFinish: true
+              waitRefreshTime: "15"
+              waitTimeOut: "60"
+              downloadBuildArtifacts: true
+              artifactDropDirectory: "$(Build.ArtifactStagingDirectory)"
+              storeInOutputVariable: false
+
+      - job: TfApply
+        displayName: "Run TF Apply jobs"
+        condition: and(succeeded(), ne(dependencies.gitDiff.outputs['gitDiff.DEPLOYMENTS'], ''), contains(dependencies.gitDiff.outputs['gitDiff.LAYERS'], '${{ parameters.stageLayer }}'), eq(variables.runTfApply, 'true'))
+        dependsOn:
+          - TfPlan
+          - gitDiff
+        variables:
+          deployments: $[ dependencies.gitDiff.outputs['gitDiff.DEPLOYMENTS'] ]
+          pipelineFolderPath: $(TfApplyPipelineFolderPath)
+          pipelineName: $(TfApplyPipelineName)
+        steps:
+          - template: template.step.checkout.terraform-code.yml
+
+          - task: Bash@3
+            inputs:
+              targetType: "inline"
+              script: |
+                if [ -z "${SYSTEM_DEBUG}" ]; then
+                  systemdebug="false"
+                else
+                  systemdebug="true"
+                fi
+
+                IFS=' ' read -r -a deployments <<< "$(deployments)"
+
+                for deployment in "${deployments[@]}"
+                do
+                if [[ $deployment == ${{ parameters.stageLayer }}* ]]; then 
+                    vars='{"DEPLOYMENT_DIR": "'"${deployment}"'", "ENVIRONMENT": "'"$(ENVIRONMENT)"'", "azureSubscription": "'"$(azureSubscription)"'", "System.Debug": "'"${systemdebug}"'","tfCodeBranch": "'"$(tfCodeBranch)"'"}'
+                    varsArray=("${varsArray[@]}" "${vars}")
+                fi
+                done
+
+                varsOut=$(IFS=','; echo "${varsArray[*]}")
+
+                echo "##vso[task.setvariable variable=runPipelinesBuildParameters][${varsOut}]"
+              failOnStderr: true
+
+          - task: RunPipelines@2
+            inputs:
+              serviceConnection: "$(runPipelinesServiceConnection)"
+              project: "$(System.TeamProject)"
+              folderPath: "$(pipelineFolderPath)"
+              buildDefinition: "$(pipelineName)"
+              setBranch: false
+              Branch: "$(Build.SourceBranch)"
+              targetType: "inline"
+              buildParameters: "$(runPipelinesBuildParameters)"
+              customPrefix: "TfApply-${{ parameters.stageLayer }}"
+              waitForQueuedBuildsToFinish: true
+              waitRefreshTime: "15"
+              waitTimeOut: "60"
+              storeInOutputVariable: false
+
+      - job: RunIntegrationTest
+        displayName: "Run Integration Test"
+        condition: and(succeeded(), ne(dependencies.gitDiff.outputs['gitDiff.DEPLOYMENTS'], ''), contains(dependencies.gitDiff.outputs['gitDiff.LAYERS'], '${{ parameters.stageLayer }}'), eq(variables.RunIntegrationTest, 'true'))
+        dependsOn:
+          - gitDiff
+          - TfPlan
+          - TfApply
+        steps:
+          - template: template.step.checkout.terraform-code.yml
+              
+          - template: template.step.integrationtesting.yml
+            parameters:
+              tags: ${{ parameters.tags }}

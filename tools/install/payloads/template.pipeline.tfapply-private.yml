@@ -1,0 +1,73 @@
+###################################
+# TF Apply Pipeline Configuration #
+###################################
+
+name: $(BuildDefinitionName).$(DayOfYear)$(Rev:.r)
+
+trigger:
+  - none
+
+pr:
+  - none
+
+pool:
+  vmImage: "ubuntu-latest"
+
+resources:
+  repositories:
+  - repository: Terraform-Code
+    type: git
+    name: Terraform-Code
+    ref: 'refs/heads/master'
+      
+variables:
+  - name: workDir
+    value: "$(System.DefaultWorkingDirectory)/terraform"
+  #- name: environment #Variable is passed in as queue time variable
+  #  value: "staging"
+  #- name: "DEPLOYMENT_DIR" #Variable is passed in as queue time variable
+  #  value: ''
+  #- name: azureSubscription #Variable is passed in as queue time variable
+  #  value: "dev"
+  - group: tool_versions
+
+
+stages:
+  - stage: RunTfApply
+    displayName: "Run TF Plan on workdir and output plan and plan.json as pipeline artifacts"
+    jobs:
+      - job: RunTfApplyJob
+        steps:
+          - template: ./templates/template.step.checkout.terraform-code.yml
+                       
+          - template: ./templates/template.step.setupenv.yml
+            parameters:
+              environment: $(ENVIRONMENT)
+
+          - template: ./templates/template.step.install.terraform.yml
+            parameters:
+              version: $(terraform)
+
+          - template: ./templates/template.step.setup.tfinit.options.yml
+
+          - task: TerraformCLI@0
+            displayName: "Run TF Init"
+            inputs:
+              command: "init"
+              workingDirectory: "$(workDir)/$(DEPLOYMENT_DIR)"
+              backendType: "azurerm"
+              backendServiceArm: "$(azureSubscription)"
+              backendAzureRmResourceGroupName: "$(TF_VAR_BACKEND_RESOURCE_GROUP_NAME)"
+              backendAzureRmStorageAccountName: "$(TF_VAR_BACKEND_STORAGE_ACCOUNT_NAME)"
+              backendAzureRmContainerName: "$(TF_VAR_BACKEND_CONTAINER_NAME)"
+              backendAzureRmKey: "$(DEPLOYMENT_DIR)"              
+              commandOptions: '-backend-config="environment=AZURESTACKCLOUD" $(TF_INIT_COMMAND_OPTIONS)'
+
+          - task: TerraformCLI@0
+            displayName: "Run TF Apply"
+            inputs:
+              command: "apply"
+              environmentServiceName: "$(azureSubscription)"
+              workingDirectory: "$(workDir)/$(DEPLOYMENT_DIR)"
+              secureVarsFile: "$(ENVIRONMENT).compiled.env"
+              commandOptions: "-input=false -auto-approve"

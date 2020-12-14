@@ -1,0 +1,88 @@
+# Check status and update the current state
+parameters:
+  - name: NewStatus
+    type: string
+  - name: expireDurationDays
+    type: number
+    default: 6
+
+steps:
+  - task: AzureCLI@2
+    displayName: Update Variable Group variables
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+      PR_VARIABLE_GROUP_NAME: 'pullrequest.state'
+    inputs:
+      azureSubscription: "$(azureSubscription)"
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        request_get() {
+          request_uri=${1}
+
+          local _response
+
+          _response=$(curl \
+              --silent \
+              --location \
+              --header 'Content-Type: application/json; charset=utf-8' \
+              -u ":$(System.AccessToken)" \
+              --request GET ${request_uri} )
+
+          echo $_response
+        }
+
+        request_put() {
+          request_uri=${1}
+          payload=${2}
+
+          local _response
+
+          _response=$(curl \
+              --silent \
+              --location \
+              --header 'Content-Type: application/json; charset=utf-8' \
+              -u ":$(System.AccessToken)" \
+              --request PUT ${request_uri} \
+              --data-raw "${payload}" \
+              --compressed)
+
+          echo $_response
+        }
+
+        # az extension add --name azure-devops
+        export AZURE_DEVOPS_EXT_PAT=$(System.AccessToken)
+
+        declare organizationURL=""
+        declare project=""
+        declare id=""
+        declare variableGroupName="pullrequest.state"
+
+        function initialize() {
+          variableGroupName=$PR_VARIABLE_GROUP_NAME
+          organizationURL=$(System.CollectionUri)
+          project="$(System.TeamProject)"
+          id=$(request_get "${organizationURL}/${project}/_apis/distributedtask/variablegroups?groupName=pullrequest.state&api-version=5.0-preview.1" | jq '.value[].id')
+          # id=$(az pipelines variable-group list --org $organizationURL --project "${project}" --group-name "pullrequest.state" | jq -r '.[0] | .id')
+          echo "** initialize id: ${id}"
+        }
+
+        function getNewExpireDate() {
+          current=$(date "+%s")
+          newExpireDate=$((current + (3600 * 24 * ${{ parameters.expireDurationDays }})))
+          echo $newExpireDate
+        }
+
+        function updateStatus() {
+          initialize        
+          newExpireDate=`getNewExpireDate`
+
+          _payload=$(cat "azure-pipelines/payloads/template.vg.update.json" | sed 's~__PULL_REQUEST_NUMBER__~'"$(System.PullRequest.PullRequestId)"'~' | sed 's~__EXPIRE_DATE__~'"$(date --date @${newExpireDate} "+%m/%d/%Y %H:%M")"'~' | sed 's~__STATUS__~${{ parameters.NewStatus }}~' | sed 's~__VARIABLE_GROUP_NAME__~'"${variableGroupName}"'~' | jq --compact-output --raw-output '.')
+          request_put "${organizationURL}/${project}/_apis/distributedtask/variablegroups/${id}?api-version=5.0-preview.1" "${_payload}"
+
+          # az pipelines variable-group variable update --id $id --name "PullRequestNumber" --value "$(System.PullRequest.PullRequestId)" --org $organizationURL --project "${project}" 
+          # az pipelines variable-group variable update --id $id --name "ExpireDate" --value "$(date --date @${newExpireDate} "+%m/%d/%Y %H:%M")" --org $organizationURL --project "${project}" 
+          # az pipelines variable-group variable update --id $id --name "Status" --value ${{ parameters.NewStatus }} --org $organizationURL --project "${project}" 
+        }
+
+        updateStatus

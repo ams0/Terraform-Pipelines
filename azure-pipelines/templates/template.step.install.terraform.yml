@@ -1,0 +1,11 @@
+parameters:
+  - name: version
+    type: string
+    default: ""
+
+steps:
+  - task: TerraformInstaller@0
+    displayName: "Install Terraform - ${{ parameters.version }}"
+    condition:  and(succeeded(), eq(variables.INSTALL_TYPE, 'PAAS'))
+    inputs:
+      terraformVersion: "${{ parameters.version }}"

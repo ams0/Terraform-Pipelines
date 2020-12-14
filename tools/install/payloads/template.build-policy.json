@@ -1,0 +1,23 @@
+{
+  "type": {
+    "id": "__POLICY_ID__"
+  },
+  "revision": 1,
+  "isDeleted": false,
+  "isBlocking": true,
+  "isEnabled": true,
+  "settings": {
+    "buildDefinitionId": __PIPELINE_ID__,
+    "displayName": "Terraform PR",
+    "manualQueueOnly": false,
+    "queueOnSourceUpdateOnly": true,
+    "validDuration": 720,
+    "scope": [
+      {
+        "repositoryId": "__REPOSITORY_ID__",
+        "refName": "refs/heads/master",
+        "matchKind": "Exact"
+      }
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "ManagementPortalURL": "https://portal.azure.us",
+  "Name": "AzureUSGovernment",
+  "PublishSettingsURL": "https://portal.azure.us/publishsettings/index",
+  "ServiceManagementEndpoint": "https://management.core.usgovcloudapi.net/",
+  "ResourceManagerEndpoint": "https://management.usgovcloudapi.net/",
+  "ActiveDirectoryEndpoint": "https://login.microsoftonline.us/",
+  "GalleryEndpoint": "https://gallery.usgovcloudapi.net/",
+  "KeyVaultEndpoint": "https://vault.usgovcloudapi.net/",
+  "GraphEndpoint": "https://graph.windows.net/",
+  "ServiceBusEndpoint": "https://servicebus.usgovcloudapi.net/",
+  "BatchManagementEndpoint": "https://batch.core.usgovcloudapi.net/",
+  "StorageEndpointSuffix": "core.usgovcloudapi.net",
+  "SQLDatabaseDNSSuffix": "database.usgovcloudapi.net",
+  "TrafficManagerDNSSuffix": "usgovtrafficmanager.net",
+  "KeyVaultDNSSuffix": "vault.usgovcloudapi.net",
+  "ServiceBusEndpointSuffix": "servicebus.usgovcloudapi.net",
+  "ServiceManagementVMDNSSuffix": "usgovcloudapp.net",
+  "ResourceManagerVMDNSSuffix": "cloudapp.windowsazure.us",
+  "ContainerRegistryDNSSuffix": "azurecr.us",
+  "CosmosDBDNSSuffix": "documents.azure.us",
+  "TokenAudience": "https://management.usgovcloudapi.net/",
+  "ResourceIdentifiers": {
+    "Graph": "https://graph.windows.net/",
+    "KeyVault": "https://vault.usgovcloudapi.net",
+    "Batch": "https://batch.core.usgovcloudapi.net/",
+    "OperationalInsights": "https://api.loganalytics.us",
+    "Storage": "https://storage.azure.com/"
+  }
+}

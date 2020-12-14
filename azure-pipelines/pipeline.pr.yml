@@ -1,0 +1,149 @@
+trigger: none
+
+pool:
+  vmImage: "ubuntu-latest"
+
+resources:
+  repositories:
+  - repository: Terraform-Code
+    type: git
+    name: Terraform-Code
+    ref: 'master'
+    
+variables:
+  ###############################################################
+  # Commented vars have to be declared on pipeline object level #
+  ###############################################################
+  # - name: gitDiffBaseBranch
+  #   value: 'master'
+  # - name: FULL_DEPLOYMENT #If this variable is detected by gitDiff to be present, gitDiff will return all layers and deployments
+  #   value: true
+  # - name: environment
+  #   value: "pr"
+  # - name: azureSubscription
+  #   value: "arm_service_connection_name"
+  # - name: DEPLOYMENT_DIR
+  #   value: "layer_xx/deployment_xx"  
+  # - name: autoDestroy
+  #   value: "true"
+  - name: runPipelinesServiceConnection
+    value: "sc-ado"
+  - name: InfraPipelineName
+    value: "pr.infrastructure"
+  - name: InfraPipelineFolderPath
+    value: "\\infrastructure"
+  - name: DestroyPipelineFolderPath
+    value: "\\infrastructure\\shared"
+  - name: DestroyPipelineName
+    value: "tfdestroy.full"        
+  - group: pullrequest.state
+
+stages:
+
+  # ################################################
+  # # Apply Infrastructure from the Master Branch #
+  # ################################################
+  - stage: ApplyMaster
+    displayName: "Apply Master"
+    jobs:
+      - job: JobApplyMaster
+        displayName: "Job Apply Master Branch"
+        steps:
+          - template: ./templates/template.step.checkstatus.yml
+            parameters:
+              PullRequestNumber: $(PullRequestNumber)
+              ExpireDate: $(ExpireDate)
+              Status: $(Status)
+          - template: ./templates/template.step.fetchcurrentstatus.yml
+          - task: RunPipelines@2
+            displayName: "Apply Master Branch"
+            condition: and(succeeded(), eq(variables['Status'], 'Started'))
+            inputs:
+              serviceConnection: "$(runPipelinesServiceConnection)"
+              project: $(System.TeamProject)
+              folderPath: "$(InfraPipelineFolderPath)"
+              buildDefinition: "$(InfraPipelineName)"
+              setBranch: false
+              Branch: 'master'
+              buildParameters: '[{"gitDiffBaseBranch": "$(gitDiffBaseBranch)","FULL_DEPLOYMENT": "true","DEPLOYMENT_DIR": "$(DEPLOYMENT_DIR)"}]'
+              targetType: 'inline'
+              customPrefix: 'master.'
+              waitForQueuedBuildsToFinish: true
+              waitRefreshTime: '10'
+              waitTimeOut: '120'
+              storeInOutputVariable: false
+
+          - template: ./templates/template.step.updatestatus.yml
+            parameters:
+              NewStatus: "MasterApplied"
+
+  # #############################################################
+  # # Verify and Apply Changes associated with the Pull Request #
+  # #############################################################
+  - stage: ApplyBranch 
+    displayName: "Apply PR Source Branch"
+    dependsOn: ApplyMaster
+    jobs:
+      - job: JobApplyBranch
+        displayName: "Job Apply Source Branch"
+        steps:
+          - template: ./templates/template.step.fetchcurrentstatus.yml
+          - script: |
+              sourceBranch=$(System.PullRequest.SourceBranch)
+              branchName=$(echo $sourceBranch | sed -e "s/refs\/heads\///")
+              echo "System.PullRequest.SourceBranch: $(System.PullRequest.SourceBranch)"
+              echo "branchName: ${branchName}"
+              echo "##vso[task.setvariable variable=tfCodeBranch;isOutput=true]$branchName"                  
+            name: exportCodeBranch
+
+          - script: echo "tfCodeBranch:$(exportCodeBranch.tfCodeBranch)"
+          - task: RunPipelines@2 
+            displayName: "Apply $(System.PullRequest.SourceBranch) Branch"
+            condition: and(succeeded(), eq(variables['Status'], 'MasterApplied'))
+            inputs:
+              serviceConnection: "$(runPipelinesServiceConnection)"
+              project: $(System.TeamProject)
+              folderPath: "$(InfraPipelineFolderPath)"
+              buildDefinition: "$(InfraPipelineName)"
+              setBranch: false
+              Branch: 'master'
+              buildParameters: '[{"gitDiffCompareBranch": "$(exportCodeBranch.tfCodeBranch)","FULL_DEPLOYMENT": "$(FULL_DEPLOYMENT)","DEPLOYMENT_DIR": "$(DEPLOYMENT_DIR)","tfCodeBranch" : "$(exportCodeBranch.tfCodeBranch)"}]'
+              targetType: 'inline'
+              customPrefix: 'pr.'
+              waitForQueuedBuildsToFinish: true
+              waitRefreshTime: '10'
+              waitTimeOut: '120'
+              storeInOutputVariable: false
+
+          - template: ./templates/template.step.updatestatus.yml
+            parameters:
+              NewStatus: "Completed"
+
+  - stage: Delete 
+    displayName: "Destroy PR Environment"
+    condition: and(succeeded(), eq(variables['autoDestroy'], 'true'))
+    dependsOn: ApplyBranch
+    variables:
+      codeBranch: $[ stageDependencies.ApplyBranch.JobApplyBranch.outputs['exportCodeBranch.tfCodeBranch'] ]
+    jobs:
+      - job: JobDestroyPR
+        displayName: "Job Destroy PR Environment"
+        steps:
+        - script: |
+            echo "Code Branch: $(codeBranch)"
+        - task: RunPipelines@2 
+          displayName: "Destroy PR Environment"
+          inputs:
+            serviceConnection: "$(runPipelinesServiceConnection)"
+            project: $(System.TeamProject)
+            folderPath: "$(DestroyPipelineFolderPath)"
+            buildDefinition: "$(DestroyPipelineName)"
+            setBranch: false
+            Branch: 'master'
+            buildParameters: '[{"gitDiffBaseBranch": "$(gitDiffBaseBranch)","FULL_DEPLOYMENT": "$(FULL_DEPLOYMENT)","DEPLOYMENT_DIR": "$(DEPLOYMENT_DIR)","tfCodeBranch" : "$(codeBranch)","environment": "$(environment)"}]'
+            targetType: 'inline'
+            customPrefix: 'pr.'
+            waitForQueuedBuildsToFinish: true
+            waitRefreshTime: '10'
+            waitTimeOut: '120'
+            storeInOutputVariable: false      

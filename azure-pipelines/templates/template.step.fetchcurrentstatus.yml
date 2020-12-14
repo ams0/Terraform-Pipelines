@@ -1,0 +1,50 @@
+# Check status and update the current state
+steps:
+  - task: AzureCLI@2
+    displayName: Fetch current status and update variables
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    inputs:
+      azureSubscription: "$(azureSubscription)"
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        request_get() {
+          request_uri=${1}
+
+          local _response
+
+          _response=$(curl \
+              --silent \
+              --location \
+              --header 'Content-Type: application/json; charset=utf-8' \
+              -u ":$(System.AccessToken)" \
+              --request GET "${request_uri}")
+
+          echo ${_response}
+        }
+
+        # az extension add --name azure-devops
+        export AZURE_DEVOPS_EXT_PAT=$(System.AccessToken)
+
+        organizationURL="$(System.CollectionUri)"
+        project="$(System.TeamProject)"
+
+        response=$(request_get "${organizationURL}/${project}/_apis/distributedtask/variablegroups?groupName=pullrequest.state&api-version=5.0-preview.1")
+
+        # id=$(echo "${response}" | jq --compact-output --raw-output '.value[].id')
+        pullRequestNumber=$(echo "${response}" | jq --compact-output --raw-output '.value[].variables.PullRequestNumber.value')
+        expireDate=$(echo "${response}" | jq --compact-output --raw-output '.value[].variables.ExpireDate.value')
+        status=$(echo "${response}" | jq --compact-output --raw-output '.value[].variables.Status.value')
+
+        echo "pullRequestNumber: ${pullRequestNumber}"
+        echo "expireDate: ${expireDate}"
+        echo "status: ${status}"
+
+        # id=$(az pipelines variable-group list --org $organizationURL --project "${project}" --group-name "pullrequest.state" | jq -r '.[0] | .id')
+        # pullRequestNumber=$(az pipelines variable-group variable list --id $id --org $organizationURL --project "${project}" --query PullRequestNumber.value | xargs)
+        # expireDate=$(az pipelines variable-group variable list --id $id --org $organizationURL --project "${project}" --query ExpireDate.value | xargs)
+        # status=$(az pipelines variable-group variable list --id $id --org $organizationURL --project "${project}" --query Status.value | xargs)
+        echo "##vso[task.setvariable variable=PullRequestNumber;]${pullRequestNumber}"
+        echo "##vso[task.setvariable variable=ExpireDate;]${expireDate}"
+        echo "##vso[task.setvariable variable=Status;]${status}"

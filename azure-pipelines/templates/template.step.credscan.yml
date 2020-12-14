@@ -1,0 +1,28 @@
+steps:
+  - task: CredScan@3
+    displayName: "Credential Scanner"
+    inputs:
+      batchSize: "32"
+
+  - task: SdtReport@1
+    displayName: "Security Analysis Report"
+    inputs:
+      AllTools: false
+      CredScan: true
+      ToolLogsNotFoundAction: "Standard"
+
+  - task: PublishSecurityAnalysisLogs@2
+    displayName: "Publish Security Analysis Logs"
+    inputs:
+      ArtifactName: "CodeAnalysisLogs"
+      ArtifactType: "Container"
+      AllTools: false
+      CredScan: true
+      ToolLogsNotFoundAction: "Standard"
+
+  - task: PostAnalysis@1
+    displayName: "Post Analysis"
+    inputs:
+      AllTools: false
+      CredScan: true
+      ToolLogsNotFoundAction: "Standard"

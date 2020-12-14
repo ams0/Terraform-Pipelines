@@ -1,0 +1,15 @@
+{
+    "variables": {
+        "PullRequestNumber": {
+            "value": "__PULL_REQUEST_NUMBER__"
+        },
+        "ExpireDate": {
+            "value": "__EXPIRE_DATE__"
+        },
+        "Status": {
+            "value": "__STATUS__"
+        }
+    },
+    "type": "Vsts",
+    "name": "__VARIABLE_GROUP_NAME__"
+}

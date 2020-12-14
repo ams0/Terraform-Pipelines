@@ -1,0 +1,132 @@
+###############################################################
+# Stage Configuration and Execution Ordering for Storage Init #
+###############################################################
+
+stages:
+  - stage:
+    displayName: "Validate Configuration and run TF Lint on all files"
+    jobs:
+      - job: ValidateAndApply
+        steps:
+          - checkout: self
+
+          - task: AzureCLI@2
+            displayName: Reset PR Environment
+            condition: and(succeeded(), and( eq(variables['environment'], 'pr'), eq(variables['resetTFStateContainer'], 'true')))  
+            env:
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+              ACCESS_TOKEN: $(System.AccessToken)
+              AZDO_ORG_URI: $(System.CollectionUri)
+              AZDO_PROJECT_NAME: $(System.TeamProject)       
+              FROM_PIPELINE: true  
+              SCRIPT_COMMAND: "reset"
+            inputs:
+              workingDirectory: Terraform-Pipelines/tools/install
+              azureSubscription: "$(azureSubscription)"
+              scriptType: bash
+              scriptPath: Terraform-Pipelines/tools/install/reset-pr-environment.sh
+
+          - template: template.step.install.terraform.yml
+            parameters:
+              version: $(terraform)
+
+          - template: template.step.install.tflint.yml
+            parameters:
+              version: $(tflint)
+              sha: $(tflint_sha256)
+
+          - checkout: "Terraform-Code"
+          - task: Bash@3
+            displayName: Checkout tfCodeBranch
+            inputs: 
+              workingDirectory: Terraform-Code
+              targetType: 'inline'
+              script: |
+                echo "Checking out '$(tfCodeBranch)'"
+                git checkout $(tfCodeBranch)
+          
+          - task: Bash@3
+            displayName: "Run TF Lint"
+            inputs:
+              targetType: "inline"
+              script: |
+                if [[ "$(tflint "$(System.DefaultWorkingDirectory)/Terraform-Code/terraform/01_init" | wc -l)" -gt 0 ]]; then
+                  echo "##vso[task.logissue type=error]01_init failed tflint scan."
+                  exitcode=1
+                else
+                  echo "TFLint passed."
+                fi
+
+          - task: DownloadSecureFile@1    
+            condition: and(succeeded(), eq(variables['environment'], 'pr'))
+            name: prstorageinitstate
+            inputs:
+              secureFile: 'pr.storage.init.state'
+              
+          - script: |
+              cp $(prstorageinitstate.secureFilePath) $(System.DefaultWorkingDirectory)/Terraform-Code/terraform/01_init/terraform.tfstate
+            displayName: Copy pr state file to terraform.tfstate
+            condition: and(succeeded(), eq(variables['environment'], 'pr'))
+
+          - template: ./template.step.setupenv.yml
+            parameters:
+              environment: $(environment)
+
+          - template: template.step.setup.tfinit.options.yml
+          
+          - task: TerraformCLI@0
+            displayName: "Run TF Init"
+            inputs:
+              command: "init"
+              workingDirectory: "$(System.DefaultWorkingDirectory)/Terraform-Code/terraform/01_init"
+              commandOptions: '$(TF_INIT_COMMAND_OPTIONS)'
+              
+          - task: TerraformCLI@0
+            displayName: "Run TF Plan"
+            inputs:
+              command: "plan"
+              environmentServiceName: $(azureSubscription)
+              workingDirectory: "$(System.DefaultWorkingDirectory)/Terraform-Code/terraform/01_init"
+              secureVarsFile: "$(environment).compiled.env"
+              commandOptions: "-input=false -out=$(Build.ArtifactStagingDirectory)/$(environment)-storage-init.plan"
+
+          - task: TerraformCLI@0
+            displayName: "Run TF Apply"
+            inputs:
+              command: "apply"
+              environmentServiceName: $(azureSubscription)
+              workingDirectory: "$(System.DefaultWorkingDirectory)/Terraform-Code/terraform/01_init"
+              secureVarsFile: "$(environment).compiled.env"
+              commandOptions: "-input=false $(Build.ArtifactStagingDirectory)/$(environment)-storage-init.plan"
+
+          - task: Bash@3
+            displayName: "Copy TF State to Artifacts"
+            inputs:
+              targetType: "inline"
+              script: |
+                cp $(System.DefaultWorkingDirectory)/Terraform-Code/terraform/01_init/terraform.tfstate $(Build.ArtifactStagingDirectory)/terraform.tfstate
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Artifacts"
+            inputs:
+              PathtoPublish: "$(Build.ArtifactStagingDirectory)"
+              ArtifactName: "remote state artifacts"
+              publishLocation: "Container"
+
+          - task: AzureCLI@2
+            displayName: Update Secure File
+            condition: and(succeeded(), eq(variables['environment'], 'pr'))
+            env:
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+              ACCESS_TOKEN: $(System.AccessToken)
+              AZDO_ORG_URI: $(System.CollectionUri)
+              AZDO_PROJECT_NAME: $(System.TeamProject)       
+              FROM_PIPELINE: true  
+              STATE_FILE: $(Build.ArtifactStagingDirectory)/terraform.tfstate
+              SCRIPT_COMMAND: "save"
+            inputs:
+              workingDirectory: Terraform-Pipelines/tools/install
+              azureSubscription: "$(azureSubscription)"
+              scriptType: bash
+              scriptPath: Terraform-Pipelines/tools/install/reset-pr-environment.sh
+       

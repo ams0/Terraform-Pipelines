@@ -1,0 +1,17 @@
+{
+  "token": "repoV2/__PROJECT_ID__/__REPOSITORY_ID__/",
+  "merge": true,
+  "accessControlEntries": [
+    {
+      "descriptor": "Microsoft.TeamFoundation.ServiceIdentity;__GROUP_DOMAIN_ID__:Build:__PROJECT_ID__",
+      "allow": 4,
+      "deny": 0,
+      "extendedInfo": {
+        "effectiveAllow": 4,
+        "effectiveDeny": 0,
+        "inheritedAllow": 4,
+        "inheritedDeny": 0
+      }
+    }
+  ]
+}

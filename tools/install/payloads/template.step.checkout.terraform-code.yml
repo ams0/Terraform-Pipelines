@@ -1,0 +1,33 @@
+steps:
+  - checkout: "git://__AZDO_PROJECT_NAME__/Terraform-Code@refs/heads/master"
+
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'
+      script: |
+        _error() {
+            printf "\e[31mERROR: $@\n\e[0m"
+        }
+
+        itemExists=false
+        reason=
+
+        if [[ -f "$tfCodeBranch" ]];then
+            itemExists=true
+            reason="file"
+        fi
+
+        if [[ -d "$tfCodeBranch" ]];then
+            itemExists=true
+            reason="folder"
+        fi
+
+        if [ "$itemExists" == true ]; then
+            _error "Error: Can't checkout $tfCodeBranch branch because a $reason with the same name exists. Please see the docs for more information."
+            exit 1
+        fi
+
+        echo "Checking out '$(tfCodeBranch)'"
+        git checkout $(tfCodeBranch)
+
+    

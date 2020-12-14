@@ -1,0 +1,16 @@
+{
+  "variables": {
+    "ExpireDate": {
+      "value": "01/01/2099 16:17"
+    },
+    "PullRequestNumber": {
+      "value": "0"
+    },
+    "Status": {
+      "value": "Aborted"
+    }
+  },
+  "type": "Vsts",
+  "name": "__VG_NAME__",
+  "description": "Pull Request variable group"
+}

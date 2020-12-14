@@ -1,0 +1,32 @@
+# Check status and update the current state
+parameters:
+  - name: PullRequestNumber
+    type: string
+  - name: ExpireDate
+    type: string
+  - name: Status
+    type: string
+  - name: expireDurationDays
+    type: number
+    default: 6
+
+steps:
+  - task: AzureCLI@2
+    displayName: Check the current PR status
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+      ACCESS_TOKEN: $(System.AccessToken)
+      EXPIRE_DURATION_DAYS: ${{ parameters.expireDurationDays }}
+      COLLECTION_URL: $(System.CollectionUri)
+      TEAM_PROJECT: $(System.TeamProject)
+      PR_VARIABLE_GROUP_NAME: 'pullrequest.state'
+      FROM_PIPELINE: true
+      EXPIRE_DATE: ${{ parameters.ExpireDate }}
+      STATUS: ${{ parameters.Status }}
+      PULL_REQUEST_ID: $(System.PullRequest.PullRequestId)
+      PULL_REQUEST_NUMBER: ${{ parameters.PullRequestNumber }}
+    inputs:
+      workingDirectory: azure-pipelines/scripts
+      azureSubscription: "$(azureSubscription)"
+      scriptType: bash
+      scriptPath: azure-pipelines/scripts/checkstatus.sh

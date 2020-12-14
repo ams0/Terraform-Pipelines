@@ -1,0 +1,42 @@
+parameters:
+  - name: version
+    type: string
+    default: ""
+  - name: sha
+    type: string
+    default: ""
+
+steps:
+  # More info at https://github.com/Microsoft/azure-pipelines-tasks/blob/master/docs/bashnote.md
+  # - script: |
+  #     chmod +x '$(System.DefaultWorkingDirectory)/tools/install_tflint.sh'
+  #   displayName: 'Set executable bit on target script'
+
+  # - task: Bash@3
+  #   displayName: 'Install TF Lint - ${{ parameters.version }}'
+  #   inputs:
+  #     filePath: '$(System.DefaultWorkingDirectory)/tools/install_tflint.sh'
+  #     arguments: '-r ${{ parameters.version }}'
+
+  - task: Bash@3
+    displayName: "Install TF Lint - ${{ parameters.version }}"
+    inputs:
+      targetType: "inline"
+      script: |
+        echo "Installing tf lint version: "${{ parameters.version }}
+        usrLocalBin="/usr/local/bin"
+        tflintPath="$usrLocalBin/tflint"
+        if [ ! -f "$tflintPath" ]; then
+          echo "tflint not found. extracting to $usrLocalBin"
+          downloadUrl="https://github.com/terraform-linters/tflint/releases/download/${{ parameters.version }}/tflint_linux_amd64.zip"
+          echo "download url: "$downloadUrl
+          curl -fsSLo tflint.zip $downloadUrl && \
+          sudo unzip -o tflint.zip  -d $usrLocalBin && \
+          rm tflint.zip
+        else
+          echo "Found tf lint. Skipping install"
+        fi
+        tflint -v   
+
+     
+        

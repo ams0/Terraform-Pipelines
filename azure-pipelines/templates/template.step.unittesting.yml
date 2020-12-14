@@ -1,0 +1,26 @@
+steps:
+  - task: GoTool@0
+    displayName: "Install Go"  
+    inputs:
+      version: $(goversion)
+      goBin: "$(System.DefaultWorkingDirectory)"
+
+  - task: AzureCLI@2
+    displayName: "Run unit tests for helpers"
+    inputs:
+      azureSubscription: $(azureSubscription)
+      scriptType: "bash"
+      scriptLocation: "inlineScript"
+      inlineScript: |
+        go get github.com/jstemmer/go-junit-report
+        cd $(System.DefaultWorkingDirectory)/test/helper
+        go test -v . 2>&1 | $(System.DefaultWorkingDirectory)/go-junit-report > unit-test-report.xml
+       
+  - task: PublishTestResults@2
+    displayName: "Publish unit test results for helpers"
+    inputs:
+      testResultsFormat: "JUnit"
+      testResultsFiles: "*.xml"
+      searchFolder: "$(System.DefaultWorkingDirectory)/test/helper"
+      failTaskOnFailedTests: true
+      testRunTitle: "Unit testing"

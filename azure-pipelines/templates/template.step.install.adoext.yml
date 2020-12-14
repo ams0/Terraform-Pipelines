@@ -1,0 +1,21 @@
+steps:
+  - task: AzureCLI@2
+    displayName: "Install Azure DevOps Extension"
+    inputs:
+      azureSubscription: $(azureSubscription)
+      scriptType: "bash"
+      scriptLocation: "inlineScript"
+      inlineScript: |
+        echo 'Install Azure DevOps Extension on the agent'
+        az extension add --name azure-devops
+
+        echo 'Verify Extension installation'
+        az extension list
+
+        echo 'Configure project defaults'
+        az devops configure --defaults organization='$(System.TeamFoundationCollectionUri)' project='$(System.TeamProject)'
+
+        echo 'List configuration - Azure DevOps Extension'
+        az devops configure --list
+
+        echo 'Installation completed'

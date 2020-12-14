@@ -1,0 +1,35 @@
+## Shellspec ###
+env.sh
+azure-pipelines/script/report
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+/out/
+/secrets
+
+### Terraform ###
+**/.terraform
+*.tfstate
+*.tfplan
+*.backup
+*.plan
+
+### VSCode ###
+**/.vscode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+### OTHER ###
+/temp
+**/*/plugins/*
+.DS_Store
+tools/**/local-*
+tools/install/temp
+tools/install/users.csv
+debug.log

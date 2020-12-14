@@ -1,0 +1,54 @@
+parameters:
+  - name: tags
+    type: string
+    default: ""
+  - name: target
+    type: string
+    default: "terraform"
+
+steps:
+  - task: DownloadSecureFile@1
+    displayName: "Download Environment File"
+    inputs:
+      secureFile: "$(ENVIRONMENT).compiled.env"
+
+  - task: GoTool@0
+    displayName: "Install Go"  
+    inputs:
+      version: $(goversion)
+      goBin: "$(System.DefaultWorkingDirectory)"
+
+  - task: AzureCLI@2
+    displayName: "Run integration tests for tags: ${{ parameters.tags }} target: ${{ parameters.target }}"
+    inputs:
+      azureSubscription: $(azureSubscription)
+      scriptType: "bash"
+      scriptLocation: "inlineScript"
+      inlineScript: |
+        export ARM_SUBSCRIPTION_ID=`az account show | jq .id | xargs`
+        export TEST_ENV_FILE_PATH=$(Agent.TempDirectory)/$(ENVIRONMENT).compiled.env
+        set -o allexport; 
+        source $TEST_ENV_FILE_PATH
+        set +o allexport; 
+        CLUSTER_NAME=$(echo $TF_VAR_mp_engine_gateway | sed 's/.*cluster_name=\([^ ,]*\).*/\1/' | xargs)
+        export PATH=$PATH:/usr/local/bin
+        RESOURCE_GROUP_NAME=$TF_VAR_resource_group_name
+        az aks install-cli --client-version 1.14.7
+        go get github.com/jstemmer/go-junit-report
+        cd $(System.DefaultWorkingDirectory)/test/${{ parameters.target }}
+        
+        go build *.go
+        if [ -z "${{ parameters.tags }}"]; then
+          go test -v . 2>&1 | $(System.DefaultWorkingDirectory)/go-junit-report > integration-test-report.xml
+        else
+          go test -v -tags ${{ parameters.tags }} . 2>&1 | $(System.DefaultWorkingDirectory)/go-junit-report > integration-test-report.xml
+        fi
+        
+  - task: PublishTestResults@2
+    displayName: "Publish test results for tags: ${{ parameters.tags }} target: ${{ parameters.target }}"
+    inputs:
+      testResultsFormat: "JUnit"
+      testResultsFiles: "*.xml"
+      searchFolder: "$(System.DefaultWorkingDirectory)/test/${{ parameters.target }}"
+      failTaskOnFailedTests: true
+      testRunTitle: "Integration testing"

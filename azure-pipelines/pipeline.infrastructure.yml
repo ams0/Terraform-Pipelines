@@ -1,0 +1,68 @@
+##############################
+# Dev Pipeline Configuration #
+##############################
+
+name: $(BuildDefinitionName).$(DayOfYear)$(Rev:.r)
+
+trigger:
+  - none
+
+pr:
+  - none
+
+pool:
+  vmImage: "ubuntu-latest"
+
+resources:
+  repositories:
+  - repository: Terraform-Code
+    type: git
+    name: Terraform-Code
+    ref: 'refs/heads/master'
+    
+variables:
+  #############################################################
+  # Those vars have to been declared on pipeline object level #
+  #############################################################
+  # - name: gitDiffBaseBranch
+  #   value: 'master'
+  # - name: FULL_DEPLOYMENT #If this variable is detected by gitDiff to be present, gitDiff will return all layers and deployments
+  #   value: true
+  # - name: environment
+  #   value: "staging"
+  # - name: azureSubscription
+  #   value: "dev"
+  # - name: DEPLOYMENT_DIR
+  #   value: "layer_xx/deployment_xx"
+  - name: runPipelinesServiceConnection
+    value: "sc-ado"
+  - name: workDir
+    value: "$(System.DefaultWorkingDirectory)/terraform"
+  - name: runCredScan
+    value: true
+  - name: runTfValidation
+    value: true
+  - name: runTfLint
+    value: true
+  - name: runTfPlan
+    value: true
+  - name: runTfDestroy
+    value: true
+  - name: runTfApply
+    value: true
+  - name: runUnitTest
+    value: true
+  - name: runIntegrationTest
+    value: true
+  - name: TfPlanPipelineFolderPath
+    value: "\\infrastructure\\shared"
+  - name: TfApplyPipelineFolderPath
+    value: "\\infrastructure\\shared"
+  - name: TfPlanPipelineName
+    value: "tfplan"
+  - name: TfApplyPipelineName
+    value: "tfapply"
+  - group: tool_versions
+
+stages:
+  - template: ./templates/template.stage.infrastructure.yml

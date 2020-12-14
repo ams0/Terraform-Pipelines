@@ -1,0 +1,26 @@
+##############################################
+# Backup Remote State Pipeline Configuration #
+##############################################
+
+name: $(BuildDefinitionName).$(DayOfYear)$(Rev:.r)
+
+trigger:
+  - none
+
+pr:
+  - none
+
+pool:
+  vmImage: "ubuntu-latest"
+
+# variables:
+#   #############################################################
+#   # Those vars have to been declared on pipeline object level #
+#   #############################################################
+#   - name: environment
+#     value: "staging"
+#   - name: azureSubscription
+#     value: "dev"
+
+jobs:
+  - template: ./templates/template.job.backupremotestate.yml

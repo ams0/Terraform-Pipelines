@@ -1,0 +1,22 @@
+parameters:
+  deployments: string
+
+steps:
+  - template: template.step.install.terraform.yml
+    parameters:
+      version: "$(terraform)"
+
+  - task: Bash@3
+    displayName: "Run TF Validate"  
+    inputs:
+      targetType: "inline"
+      script: |
+        IFS=' ' read -r -a array <<< "${{ parameters.deployments }}"
+
+        for deployment in "${array[@]}"
+        do
+          cd "$(workDir)/$deployment"
+          terraform init -backend=false
+          terraform validate
+        done
+      failOnStderr: true

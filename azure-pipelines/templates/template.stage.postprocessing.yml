@@ -1,0 +1,26 @@
+
+stages:
+  - stage: PostProcessing_${{ parameters.stageLayer }}
+    displayName: "${{ parameters.stageLayer }} - Post Processing"
+    condition: succeeded()
+    dependsOn: ${{ parameters.previousLayer }}
+    jobs:
+      - job: SetupPermissions
+        displayName: "Setup Cluster Permissions to Resources"
+        steps:
+        - template: template.step.setupenv.yml
+          parameters:
+            environment: $(environment)
+       # - task: AzureCLI@2
+       #   displayName: "Chart Setup script"
+       #   inputs:
+       #     azureSubscription: '$(azureSubscription)'
+       #     scriptType: 'bash'
+       #     scriptLocation: 'inlineScript'
+       #     inlineScript: |
+       #       #grant contributor rights from AKS clusters to vnet which is needed for AGIC to work with pod identity.
+       #       az role assignment create --assignee $TF_VAR_MP_APPLICATION_AKS_CLIENT_ID --role Contributor --scope subscriptions/$TF_VAR_SUBSCRIPTION_ID/resourceGroups/$TF_VAR_RESOURCE_GROUP_NAME/ | true
+       #       az role assignment create --assignee $TF_VAR_MP_ENGINE_GATEWAY_AKS_CLIENT_ID --role Contributor --scope subscriptions/$TF_VAR_SUBSCRIPTION_ID/resourceGroups/$TF_VAR_RESOURCE_GROUP_NAME/ | true
+       #       az role assignment create --assignee $TF_VAR_MP_METERING_AKS_CLIENT_ID --role Contributor --scope subscriptions/$TF_VAR_SUBSCRIPTION_ID/resourceGroups/$TF_VAR_RESOURCE_GROUP_NAME/ | true
+       #       az role assignment create --assignee $TF_VAR_MP_MOCKSERVER_AKS_CLIENT_ID --role Contributor --scope subscriptions/$TF_VAR_SUBSCRIPTION_ID/resourceGroups/$TF_VAR_RESOURCE_GROUP_NAME/ | true
+       #       az role assignment create --assignee $TF_VAR_MP_MONITORING_AKS_CLIENT_ID --role Contributor --scope subscriptions/$TF_VAR_SUBSCRIPTION_ID/resourceGroups/$TF_VAR_RESOURCE_GROUP_NAME/ | true

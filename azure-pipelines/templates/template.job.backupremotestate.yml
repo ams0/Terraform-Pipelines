@@ -1,0 +1,36 @@
+jobs:
+  - job: backupRemoteState
+    displayName: "Backup remote state"
+    steps:
+      - template: ./template.step.setupenv.yml
+        parameters:
+          environment: $(environment)
+
+      - task: AzureCLI@2
+        name: backupRemoteState
+        displayName: "$(environment) - Backup Remote State."
+        inputs:
+          azureSubscription: "$(azureSubscription)"
+          scriptType: "bash"
+          scriptLocation: "inlineScript"
+          inlineScript: |
+            echo "Starting backup of $(environment) environment remote state.  Commit: $(Build.SourceVersion)}"
+
+            # Create backup container name and convert to lower case
+            backupContainerName=`echo $(Build.BuildId)-$(Build.SourceVersion) | tr '[:upper:]' '[:lower:]'`
+            backupStorageAccountName=$(TF_VAR_BACKUP_STORAGE_ACCOUNT_NAME)
+            backupResourceGroup=`az storage account list --query "[?name=='${backupStorageAccountName}'].resourceGroup" -o tsv`
+
+            sourceEndPoint=`az storage account list -g $(TF_VAR_BACKEND_RESOURCE_GROUP_NAME) --query "[?name=='$(TF_VAR_BACKEND_STORAGE_ACCOUNT_NAME)'].{endpointName:primaryEndpoints.blob}" -o tsv`
+            backupEndpoint=`az storage account list -g $backupResourceGroup --query "[?name=='${backupStorageAccountName}'].{endpointName:primaryEndpoints.blob}" -o tsv`
+
+            if [[ -n "${SYSTEM_DEBUG}" && "${SYSTEM_DEBUG}" == 'true' ]]; then
+              echo "backupContainerName: "$backupContainerName
+              echo "backupStorageAccountName: "$backupStorageAccountName
+              echo "backupResourceGroup: "$backupResourceGroup
+              echo "sourceEndPoint: "$sourceEndPoint
+              echo "backupEndpoint: "$backupEndpoint
+            fi
+
+            echo "Copying remote state to container ${backupContainerName} in storage account ${backupStorageAccountName} located in resource group ${backupResourceGroup}"
+            az storage copy -s ${sourceEndPoint}$(TF_VAR_BACKEND_CONTAINER_NAME) -d ${backupEndpoint}${backupContainerName} --recursive

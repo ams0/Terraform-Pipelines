@@ -1,0 +1,41 @@
+trigger: none
+
+pool:
+  vmImage: "ubuntu-latest"
+
+resources:
+  repositories:
+  - repository: Terraform-Code
+    type: git
+    name: Terraform-Code
+    ref: 'refs/heads/master'
+
+steps:
+- checkout: self
+  persistCredentials: true
+  
+- checkout: Terraform-Code
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: |
+      currentPath=$(pwd)
+      echo "starting update"
+      destinationFile="$currentPath/Terraform-Pipelines/azure-pipelines/pipeline.tfdestroy.full.yml"
+      sourcePath="Terraform-Code/terraform "    
+      
+      cp "$currentPath/Terraform-Pipelines/tools/install/payloads/template.pipeline.tfdestroy.full.yml" "$destinationFile"
+
+      Terraform-Pipelines/azure-pipelines/scripts/generatematrix.sh $destinationFile $sourcePath  
+
+      echo "finished generation"
+      pwd
+      ls 
+
+      cd Terraform-Pipelines
+      git config user.email "installer@terraform-template.com"
+      git config user.name "Terraform template"  
+      git add -A
+      git commit -m "updating Terraform Pipelines"
+      git push origin HEAD:master

@@ -1,0 +1,114 @@
+parameters:
+  - name: baseBranch
+    type: string
+    default: "refs/heads/master"
+  - name: compareBranch
+    type: string
+    default: ""
+
+jobs:
+  - job: gitDiff
+    displayName: "Detect Layer/Deployments changed"
+    steps:
+      - template: template.step.checkout.terraform-code.yml      
+      - task: Bash@3
+        name: gitDiff
+        displayName: "Generate Diff"
+        inputs:
+          targetType: "inline"
+          script: |
+
+            if [ -z "$(DEPLOYMENT_DIR)" ]; then
+              workDir=$(Build.SourcesDirectory)/terraform
+              echo "workDir: "$workDir
+              echo "baseBranch parameter: "${{ parameters.baseBranch }}
+              echo "compareBranch parameter: "${{ parameters.compareBranch }}
+              baseBranch="${{ parameters.baseBranch }}"
+              compareBranch="${{ parameters.compareBranch }}"
+
+              echo "baseBranch: $baseBranch"
+              echo " compareBranch: $compareBranch"
+              
+              baseBranchName="${baseBranch/refs\/heads\//}"
+              compareBranchName="${compareBranch/refs\/heads\//}"
+
+              echo "baseBranchName: $baseBranchName"
+              echo "compareBranchName $compareBranchName"
+
+              echo "checking out compareBranchName: $compareBranchName"
+              git checkout $compareBranchName
+
+              echo "checking out baseBranchName: $baseBranchName"
+              git checkout $baseBranchName
+
+              echo "switching to workDir: $workDir"
+              pushd $workDir
+
+              if [ $(FULL_DEPLOYMENT) == true ]; then
+                git checkout $compareBranchName
+                DEPLOYMENTS=`find . -type d | grep '.\/[0-9][0-9]' | cut -c 3- | grep -v '^01_init' | grep -v '.*\/modules\/.*' | grep -v '.*\/modules' | grep '.*\/.*' | sort`
+              else
+                DEPLOYMENTS=`git diff $baseBranchName..$compareBranchName --name-only --diff-filter=d | grep 'terraform\/[0-9][0-9]'| sort | grep -v '.*\/modules\/.*' | sed -e "s/^terraform\///" | cut -f1,2 -d"/" | grep -v '^01_init' | uniq | grep -v '.*\.md'`
+                IGNORE_DIR=test/terraform
+                DEPLOYMENTS=${DEPLOYMENTS//$IGNORE_DIR/}
+              fi
+
+              OIFS=$IFS;
+              IFS=" ";
+
+              DEPLOYMENTSARRAY=`echo $DEPLOYMENTS | sed 's/\.\///' | sed 's/^/"/;s/$/",/' | sed '$ s/.$//' | sed '1s/^/[/' | sed '$s/$/\]/'`
+              LAYERS=`echo $DEPLOYMENTS | cut -f1 -d"/" | uniq | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g'`
+              DEPLOYMENTS=`echo $DEPLOYMENTS | uniq | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g'`
+              DEPLOYMENTSARRAY=`echo ${DEPLOYMENTSARRAY//$'\n'/} | sed -r 's/\"/\\\"/g'`
+
+              IFS=$OIFS;
+
+              IFS=' ' read -ra layer_array <<< "$LAYERS"
+              IFS=' ' read -ra deployment_array <<< "$DEPLOYMENTS"
+              IFS=$OIFS;
+
+              declare DEPLOYMENTS_JSON="["
+              declare i=0
+              declare len=${#layer_array[@]}
+              while [ $i -lt $len ]; do
+                layer=${layer_array[i]}
+                DEPLOYMENTS_JSON+="{\\\"layer\\\":\\\"$layer\\\",\\\"deployments\\\":["
+                declare deploymentLength=${#deployment_array[@]}
+                declare k=0;
+                for deployment in ${deployment_array[@]}
+                  do 
+                    if [[ "$deployment" == *"$layer"* ]]; then
+                      DEPLOYMENTS_JSON+="{\\\"DEPLOYMENT_DIR\\\" : \\\"$deployment\\\",\\\"environment\\\" : \\\"$(environment)\\\" ,\\\"tfCodeBranch\\\" : \\\"$(tfCodeBranch)\\\"}"                      
+                    fi      
+                    let k++
+                  done
+                DEPLOYMENTS_JSON+="]}"
+                let i++
+                if [ $i -lt $len ]; then
+                  DEPLOYMENTS_JSON+=","
+                fi
+              done
+              DEPLOYMENTS_JSON+="]"
+              DEPLOYMENTS_JSON=$(echo $DEPLOYMENTS_JSON | sed -e 's/}{/},{/g')
+
+              popd
+
+              echo "Layers: ${LAYERS}"
+              echo "Deployments: ${DEPLOYMENTS}"
+              echo "Deployments Array: ${DEPLOYMENTSARRAY}"
+              echo "DeploymentsJson: ${DEPLOYMENTS_JSON}"
+
+              echo "##vso[task.setvariable variable=LAYERS;isOutput=true]${LAYERS}"
+              echo "##vso[task.setvariable variable=DEPLOYMENTS;isOutput=true]${DEPLOYMENTS}"
+              echo "##vso[task.setvariable variable=DEPLOYMENTSARRAY;isOutput=true]${DEPLOYMENTSARRAY}"
+              echo "##vso[task.setvariable variable=DEPLOYMENTSJSON;isOutput=true]${DEPLOYMENTS_JSON}"
+            else
+
+              IFS='/' read -r -a array <<< "$(DEPLOYMENT_DIR)"
+
+              echo "Layers: ${array[0]}"
+              echo "Deployments: $(DEPLOYMENT_DIR)"
+
+              echo "##vso[task.setvariable variable=LAYERS;isOutput=true]${array[0]}"
+              echo "##vso[task.setvariable variable=DEPLOYMENTS;isOutput=true]$(DEPLOYMENT_DIR)"
+            fi

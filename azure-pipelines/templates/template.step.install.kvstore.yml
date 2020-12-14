@@ -1,0 +1,16 @@
+steps:
+  - script: |
+      chmod +x "$(System.DefaultWorkingDirectory)/tools/kvstore.sh"
+      sudo install -b "$(System.DefaultWorkingDirectory)/tools/kvstore.sh" /usr/local/bin/kvstore
+
+      # Verify that kvstore dir exist
+      if [ ! -d "$(System.DefaultWorkingDirectory)/kvstore" ]; then
+        mkdir "$(System.DefaultWorkingDirectory)/kvstore"
+      fi
+
+      echo 'export KVSTORE_DIR=$(System.DefaultWorkingDirectory)/kvstore' >> /home/vsts/.bashrc
+      #verify kvstore directory
+      echo "$KVSTORE_DIR"
+      #test kvstore
+      kvstore -h
+    displayName: "Install KVStore"

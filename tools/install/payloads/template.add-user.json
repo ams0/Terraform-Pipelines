@@ -1,0 +1,21 @@
+{
+    "accessLevel": {
+        "accountLicenseType": "express"
+    },
+    "user": {
+        "principalName": "__UPN__",
+        "subjectKind": "user"
+    },
+    "projectEntitlements": [
+        {
+            "projectRef": {
+                "id": "__PROJECT_ID__"
+            },
+            "teamRefs": [
+                {
+                    "id": "__TEAM_ID__"
+                }
+            ]
+        }
+    ]
+}
