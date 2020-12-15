@@ -1,6 +1,7 @@
 {
 	"name": "Lucidity",
-	"workspaceFolder" : "/workspaces",
+	"workspaceFolder" : "/workspace",
+	"workspaceMount": "source=${localWorkspaceFolder},target=/workspace/Terraform-Pipelines,type=bind,consistency=delegated",	
 	"build": {
 		"dockerfile": "Dockerfile",
 		"args": { "VARIANT": "focal" }
