@@ -40,7 +40,7 @@ RUN git clone https://github.com/terraform-linters/tflint-ruleset-azurerm.git \
 ENV GO111MODULE=on
 ENV CGO_ENABLED=0
 
-WORKDIR /workspace/
+WORKDIR /home/vscode/workspace/
 
 # Clone Terraform-Code
 RUN git clone https://csedevops@dev.azure.com/csedevops/terraform-template-public/_git/Terraform-Code
