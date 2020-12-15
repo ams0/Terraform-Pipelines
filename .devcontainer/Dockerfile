@@ -11,7 +11,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get -y install --no-install-recommends curl jq azure-cli unzip make
 
-USER ${USERNAME}
+
 
 WORKDIR /tmp
 
@@ -40,14 +40,16 @@ RUN git clone https://github.com/terraform-linters/tflint-ruleset-azurerm.git \
 ENV GO111MODULE=on
 ENV CGO_ENABLED=0
 
-WORKDIR /home/vscode/workspace/
+WORKDIR /home/vscode/workspace
 
 # Clone Terraform-Code
-RUN git clone https://csedevops@dev.azure.com/csedevops/terraform-template-public/_git/Terraform-Code
-RUN chown -R vscode:vscode Terraform-Code
+RUN git clone https://csedevops@dev.azure.com/csedevops/terraform-template-public/_git/Terraform-Code /home/vscode/Terraform-Code
+RUN chown -R vscode:vscode /home/vscode/Terraform-Code
+RUN ln -s /home/vscode/Terraform-Code /home/vscode/workspace/Terraform-Code
 
 # Cleanup apt
 RUN apt-get autoremove -y \
     && apt-get clean -y 
 
-WORKDIR /work    
+USER ${USERNAME}
+WORKDIR /home/vscode/workspace 
