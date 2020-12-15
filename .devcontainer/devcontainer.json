@@ -1,5 +1,6 @@
 {
 	"name": "Lucidity",
+	"workspaceFolder" : "/workspaces",
 	"build": {
 		"dockerfile": "Dockerfile",
 		"args": { "VARIANT": "focal" }
